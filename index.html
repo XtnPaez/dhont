@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Calculadora D'Hondt</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3429/3429054.png" type="image/png">
+  <style>
+    body { background-color: #f8f9fa; }
+    .partido, .registro { margin-bottom: 10px; }
+    .titulo-seccion {
+      margin-top: 30px;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 5px;
+    }
+    .info-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      background-color: #0d6efd;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      color: white;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .info-button:hover { background-color: #0b5ed7; }
+    .logo { width: 40px; height: 40px; margin-right: 10px; }
+  </style>
+</head>
+<body class="container py-4">
+  <div class="d-flex align-items-center mb-4">
+    <img src="https://cdn-icons-png.flaticon.com/512/3429/3429054.png" alt="Logo" class="logo">
+    <h1 class="text-primary mb-0">Calculadora D'Hondt</h1>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Cantidad de bancas a renovar:</label>
+    <input type="number" id="totalBancas" class="form-control w-25" min="1">
+  </div>
+
+  <div class="titulo-seccion"><h5>Partidos y votos</h5></div>
+  <div id="partidosContainer"></div>
+  <button class="btn btn-outline-primary btn-sm" onclick="agregarPartido()">Agregar Partido</button>
+
+  <div class="titulo-seccion"><h5>Registro de bancas que vencen</h5></div>
+  <div class="row mb-2">
+    <div class="col-md-6">
+      <label>Título del registro:</label>
+      <input type="text" id="tituloRegistro" class="form-control">
+    </div>
+    <div class="col-md-6">
+      <label>Registros guardados:</label>
+      <select id="selectorRegistro" class="form-select" onchange="cargarRegistroSeleccionado()">
+        <option disabled selected>Elegir un registro</option>
+      </select>
+    </div>
+  </div>
+  <div id="registroContainer"></div>
+  <button class="btn btn-outline-secondary btn-sm" onclick="agregarRegistro()">Agregar Partido al Registro</button>
+  <button class="btn btn-outline-success btn-sm" onclick="guardarRegistro()">Guardar/Actualizar Registro</button>
+
+  <div class="titulo-seccion"><h5>Acciones</h5></div>
+  <button class="btn btn-primary" onclick="calcularDhondt()">Calcular Bancas</button>
+  <button class="btn btn-danger" onclick="limpiarFormulario()">Limpiar todo</button>
+
+  <div class="titulo-seccion"><h5>Resultado</h5></div>
+  <div id="resultado" class="bg-white p-3 rounded shadow-sm"></div>
+
+  <button class="info-button" data-bs-toggle="modal" data-bs-target="#infoModal">ℹ️</button>
+
+  <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="infoModalLabel">Información sobre esta aplicación</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <h6>1. ¿Cómo funciona esta página?</h6>
+          <p>Esta herramienta permite calcular la asignación de bancas legislativas según el sistema D'Hondt. Debés ingresar cuántas bancas se renuevan, qué partidos participaron, cuántos votos obtuvieron y cuántas bancas vencen para cada uno. La aplicación reparte las bancas proporcionalmente y muestra los resultados comparados con las bancas que se vencen.</p>
+
+          <h6>2. ¿Qué es el sistema D'Hondt?</h6>
+          <p>El sistema D'Hondt es un método de representación proporcional para repartir bancas legislativas entre partidos políticos en base a la cantidad de votos obtenidos. Se utiliza en muchos países, incluyendo Argentina. Solo participan del reparto los partidos que superan un umbral del 3% de los votos válidos.</p>
+
+          <h6>3. ¿Quién desarrolló esta app?</h6>
+          <p>Esta aplicación fue desarrollada por mí, una inteligencia artificial de OpenAI. La generé en respuesta a una idea que me compartieron, creando tanto el código funcional como el diseño y los textos. ¡Estoy feliz de ayudar a que más personas comprendan cómo funciona el sistema electoral!</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const partidosContainer = document.getElementById('partidosContainer');
+    const registroContainer = document.getElementById('registroContainer');
+    const selectorRegistro = document.getElementById('selectorRegistro');
+    let registros = JSON.parse(localStorage.getItem('registros')) || {};
+
+    function agregarPartido(nombre = '', votos = '') {
+      const div = document.createElement('div');
+      div.className = 'row partido';
+      div.innerHTML = `
+        <div class="col-md-6"><input type="text" class="form-control" placeholder="Partido" value="${nombre}"></div>
+        <div class="col-md-4"><input type="number" class="form-control" placeholder="% Votos" value="${votos}" min="0" max="100"></div>
+        <div class="col-md-2"><button class="btn btn-outline-danger w-100" onclick="this.parentNode.parentNode.remove()">X</button></div>
+      `;
+      partidosContainer.appendChild(div);
+    }
+
+    function agregarRegistro(nombre = '', bancas = '') {
+      const div = document.createElement('div');
+      div.className = 'row registro';
+      div.innerHTML = `
+        <div class="col-md-6"><input type="text" class="form-control" placeholder="Partido" value="${nombre}"></div>
+        <div class="col-md-4"><input type="number" class="form-control" placeholder="Bancas que vencen" value="${bancas}" min="0"></div>
+        <div class="col-md-2"><button class="btn btn-outline-danger w-100" onclick="this.parentNode.parentNode.remove()">X</button></div>
+      `;
+      registroContainer.appendChild(div);
+    }
+
+    function guardarRegistro() {
+      const titulo = document.getElementById('tituloRegistro').value.trim();
+      if (!titulo) return alert('Ingresá un título para el registro.');
+      const data = [...registroContainer.querySelectorAll('.registro')].map(row => {
+        const inputs = row.querySelectorAll('input');
+        return { partido: inputs[0].value.trim(), bancas: parseInt(inputs[1].value) || 0 };
+      });
+      registros[titulo] = data;
+      localStorage.setItem('registros', JSON.stringify(registros));
+      actualizarSelector();
+      alert('Registro guardado.');
+    }
+
+    function actualizarSelector() {
+      selectorRegistro.innerHTML = '<option disabled selected>Elegir un registro</option>';
+      Object.keys(registros).forEach(titulo => {
+        const option = document.createElement('option');
+        option.textContent = titulo;
+        selectorRegistro.appendChild(option);
+      });
+    }
+
+    function cargarRegistroSeleccionado() {
+      const titulo = selectorRegistro.value;
+      const data = registros[titulo] || [];
+      registroContainer.innerHTML = '';
+      data.forEach(r => agregarRegistro(r.partido, r.bancas));
+      document.getElementById('tituloRegistro').value = titulo;
+    }
+
+    function calcularDhondt() {
+      const totalBancas = parseInt(document.getElementById('totalBancas').value);
+      if (!totalBancas || totalBancas <= 0) return alert('Ingresá la cantidad de bancas a renovar.');
+      const partidos = [...partidosContainer.querySelectorAll('.partido')].map(row => {
+        const inputs = row.querySelectorAll('input');
+        return { partido: inputs[0].value.trim(), votos: parseFloat(inputs[1].value) || 0 };
+      }).filter(p => p.partido && p.votos >= 3);
+      const totalVotos = partidos.reduce((sum, p) => sum + p.votos, 0);
+      if (totalVotos === 0) return alert('Los votos válidos deben superar el 3% para algún partido.');
+
+      const bancasAsignadas = {};
+      const cocientes = [];
+      partidos.forEach(({ partido, votos }) => {
+        for (let i = 1; i <= totalBancas; i++) {
+          cocientes.push({ partido, valor: votos / i });
+        }
+      });
+
+      cocientes.sort((a, b) => b.valor - a.valor);
+      cocientes.slice(0, totalBancas).forEach(({ partido }) => {
+        bancasAsignadas[partido] = (bancasAsignadas[partido] || 0) + 1;
+      });
+
+      const vencidas = {};
+      [...registroContainer.querySelectorAll('.registro')].forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const partido = inputs[0].value.trim();
+        const bancas = parseInt(inputs[1].value) || 0;
+        vencidas[partido] = bancas;
+      });
+
+      let resultado = '<ul class="list-group">';
+      Object.entries(bancasAsignadas).forEach(([partido, bancas]) => {
+        resultado += `<li class="list-group-item">${partido}: ${bancas} bancas asignadas`;
+        if (partido in vencidas) resultado += ` (vencen ${vencidas[partido]})`;
+        resultado += '</li>';
+      });
+      resultado += '</ul>';
+
+      document.getElementById('resultado').innerHTML = resultado;
+    }
+
+    function limpiarFormulario() {
+      document.getElementById('totalBancas').value = '';
+      partidosContainer.innerHTML = '';
+      registroContainer.innerHTML = '';
+      document.getElementById('tituloRegistro').value = '';
+      selectorRegistro.selectedIndex = 0;
+      document.getElementById('resultado').innerHTML = '';
+    }
+
+    actualizarSelector();
+  </script>
+</body>
+</html>
